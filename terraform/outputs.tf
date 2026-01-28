@@ -8,7 +8,12 @@ output "server_ipv6" {
   description = "Public IP (v6) of the n8n server"
 }
 
-output "private_key_path" {
-  value = abspath(local_file.private_key.filename)
-  description = "Path to the generated private key"
+output "ssh_connection_command" {
+  value = "ssh telemaco@${hcloud_server.n8n_server.ipv4_address}"
+  description = "Command to SSH into the server (use your local private key)"
+}
+
+output "ssh_connection_command_root" {
+  value = "ssh root@${hcloud_server.n8n_server.ipv4_address}"
+  description = "Alternative: SSH as root (if needed initially)"
 }

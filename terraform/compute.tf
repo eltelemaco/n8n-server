@@ -16,11 +16,49 @@ resource "hcloud_server" "n8n_server" {
   # Cloud-init to set up Python for Ansible
   user_data = <<-EOF
     #cloud-config
+    package_update: true
+    package_upgrade: true
+
+    # Set timezone and locale
+    timezone: UTC
+    locale: en_US.UTF-8
+
+    # Hostname (will be overridden by Terraform server name, but good to have)
+    hostname: n8n-server
+
     packages:
       - python3
       - python3-pip
       - git
       - curl
+      - wget
+      - htop
+      - vim
+      - neovim
+      - ufw
+      - net-tools
+      - fail2ban
+      - htop
+      - iotop
+      - ncdu
+      - tree
+      - jq
+      - unzip
+      - software-properties-common
+      - apt-transport-https
+      - ca-certificates
+      - gnupg
+      - lsb-release
+    users:
+      - name: telemaco
+        sudo: ALL=(ALL) NOPASSWD:ALL
+        groups: [sudo, adm, docker]
+        shell: /bin/bash
+        ssh_authorized_keys:
+          - ${var.ssh_public_key}
+
+    ssh_pwauth: false
+    disable_root: false  # Keep root enabled initially for Hetzner's SSH key injection
     package_update: true
     package_upgrade: true
     runcmd:

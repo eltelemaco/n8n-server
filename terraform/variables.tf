@@ -10,7 +10,7 @@ variable "location" {
 variable "server_type" {
   description = "Server Type"
   type        = string
-  default     = "cpx22"
+  default     = "cpx21"
 }
 
 variable "server_image" {
@@ -19,16 +19,10 @@ variable "server_image" {
   default     = "ubuntu-24.04"
 }
 
-variable "ssh_public_key_path" {
-  description = "Path to the SSH public key to upload"
+variable "ssh_public_key" {
+  description = "SSH public key content to add to the server (store in HCP Terraform as a variable)"
   type        = string
-  default     = "~/.ssh/id_ed25519.pub"
-}
-
-variable "ssh_private_key_path" {
-  description = "Path to the SSH private key (for Ansible usage if needed)"
-  type        = string
-  default     = "~/.ssh/id_ed25519"
+  sensitive   = true # Public keys are safe to store
 }
 
 variable "allowed_ssh_ips" {
