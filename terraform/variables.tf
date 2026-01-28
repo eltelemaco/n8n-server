@@ -1,8 +1,5 @@
-variable "hcloud_token" {
-  description = "Hetzner Cloud API Token"
-  type        = string
-  sensitive   = true
-}
+# variable "hcloud_token" removed - using HCLOUD_TOKEN env var
+
 
 variable "location" {
   description = "Hetzner Cloud Location"

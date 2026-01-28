@@ -17,7 +17,7 @@ terraform {
   }
 
   cloud {
-    organization = "n8n"
+    organization = "TelemacoInfraLabs"
     workspaces {
       name = "n8n-server"
     }

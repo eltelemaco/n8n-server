@@ -1,0 +1,14 @@
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+*.tfvars.json
+**.terraform.lock.hcl*
+# Exclude generated keys
+terraform/n8n_key
+terraform/n8n_key.pub
+
+# Ansible
+*.retry
