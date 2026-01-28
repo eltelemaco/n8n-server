@@ -1,0 +1,26 @@
+---
+# Common
+sys_packages:
+  - git
+  - curl
+  - vim
+  - htop
+  - ufw
+  - fail2ban
+
+# Security / SSH
+ssh_port: 22
+allowed_users: [root]
+
+# Docker
+docker_users: [root]
+
+# n8n
+n8n_version: "latest"
+n8n_host: "localhost" # Changed to localhost for basic setup without domain
+n8n_protocol: "http"
+
+# Postgres
+postgres_user: n8n
+postgres_password: change_me_please
+postgres_db: n8n

@@ -1,0 +1,12 @@
+---
+- name: Provision n8n Server
+  hosts: n8n_servers
+  become: yes
+  vars_files:
+    - vars/main.yml
+
+  roles:
+    - common
+    - security
+    - docker
+    - n8n

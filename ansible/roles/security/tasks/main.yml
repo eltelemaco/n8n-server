@@ -1,0 +1,47 @@
+---
+# UFW Setup
+- name: Install UFW
+  apt:
+    name: ufw
+    state: present
+
+- name: Allow SSH
+  ufw:
+    rule: limit
+    port: "{{ ssh_port }}"
+    proto: tcp
+
+- name: Allow HTTP
+  ufw:
+    rule: allow
+    port: 80
+    proto: tcp
+
+- name: Allow HTTPS
+  ufw:
+    rule: allow
+    port: 443
+    proto: tcp
+
+- name: Enable UFW
+  ufw:
+    state: enabled
+
+# Fail2Ban Setup
+- name: Install Fail2Ban
+  apt:
+    name: fail2ban
+    state: present
+
+- name: Start and enable Fail2Ban
+  service:
+    name: fail2ban
+    state: started
+    enabled: yes
+
+# SSH Hardening (Basic)
+- name: Ensure SSH is running
+  service:
+    name: ssh
+    state: started
+    enabled: yes
