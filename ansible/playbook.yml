@@ -1,9 +1,16 @@
 ---
 - name: Provision n8n Server
   hosts: n8n_servers
-  become: yes
+  become: true
   vars_files:
     - vars/main.yml
+
+  pre_tasks:
+    - name: Load secrets (if present)
+      ansible.builtin.include_vars:
+        file: vars/secrets.yml
+      ignore_errors: true
+      no_log: true
 
   roles:
     - common

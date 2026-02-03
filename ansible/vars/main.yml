@@ -5,22 +5,33 @@ sys_packages:
   - curl
   - vim
   - htop
-  - ufw
-  - fail2ban
 
 # Security / SSH
 ssh_port: 22
-allowed_users: [root]
+allowed_users: [telemaco]
 
 # Docker
-docker_users: [root]
+docker_users: [telemaco]
 
 # n8n
 n8n_version: "latest"
-n8n_host: "localhost" # Changed to localhost for basic setup without domain
-n8n_protocol: "http"
+n8n_domain: "lab1.telemaco.com.mx"
+n8n_protocol: "https"
+n8n_timezone: "America/Mexico_City"
+n8n_use_self_signed: false
+n8n_use_acme_staging: false
+
+# These should be set in vars/secrets.yml (see vars/secrets.example.yml)
+n8n_encryption_key: "CHANGE_ME"
+n8n_basic_auth_active: true
+n8n_basic_auth_user: "telemaco"
+n8n_basic_auth_password: "CHANGE_ME"
+n8n_secure_cookie: true
 
 # Postgres
 postgres_user: n8n
-postgres_password: change_me_please
+postgres_password: "CHANGE_ME"
 postgres_db: n8n
+
+# Validation
+validate_n8n_externally: true

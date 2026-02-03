@@ -1,33 +1,36 @@
-#------------------------------------------------------------------------------
-# SSH Key
-#------------------------------------------------------------------------------
-# Upload the user-provided public key to Hetzner
-# The public key should be stored as a variable in HCP Terraform
+locals {
+  effective_ssh_public_key = var.create_ssh_key ? tls_private_key.n8n[0].public_key_openssh : (trimspace(var.ssh_public_key) != "" ? var.ssh_public_key : file(pathexpand(var.ssh_public_key_path)))
+}
+
+resource "tls_private_key" "n8n" {
+  count     = var.create_ssh_key ? 1 : 0
+  algorithm = "ED25519"
+}
+
+resource "local_file" "n8n_private_key" {
+  count           = var.create_ssh_key ? 1 : 0
+  filename        = pathexpand(var.ssh_private_key_path)
+  content         = tls_private_key.n8n[0].private_key_openssh
+  file_permission = "0600"
+}
+
+resource "local_file" "n8n_public_key" {
+  count           = var.create_ssh_key ? 1 : 0
+  filename        = pathexpand(var.ssh_public_key_path)
+  content         = tls_private_key.n8n[0].public_key_openssh
+  file_permission = "0644"
+}
+
 resource "hcloud_ssh_key" "n8n_key" {
-  name       = "n8n-server-key"
-  public_key = var.ssh_public_key
-}
-
-#------------------------------------------------------------------------------
-# Network
-#------------------------------------------------------------------------------
-resource "hcloud_network" "private_net" {
-  name     = "n8n-private-net"
-  ip_range = "10.0.0.0/16"
-}
-
-resource "hcloud_network_subnet" "n8n_subnet" {
-  network_id   = hcloud_network.private_net.id
-  type         = "cloud"
-  network_zone = "us-west"
-  ip_range     = "10.0.1.0/24"
+  name       = "${var.name}-key"
+  public_key = local.effective_ssh_public_key
 }
 
 #------------------------------------------------------------------------------
 # Firewall
 #------------------------------------------------------------------------------
 resource "hcloud_firewall" "n8n_fw" {
-  name = "n8n-firewall"
+  name = "${var.name}-firewall"
 
   # SSH
   rule {
@@ -95,7 +98,7 @@ resource "hcloud_firewall" "n8n_fw" {
 # Compute - Server
 #------------------------------------------------------------------------------
 resource "hcloud_server" "n8n_server" {
-  name        = "n8n-server"
+  name        = var.name
   image       = var.server_image
   server_type = var.server_type
   location    = var.location
@@ -104,61 +107,61 @@ resource "hcloud_server" "n8n_server" {
 
   firewall_ids = [hcloud_firewall.n8n_fw.id]
 
-  network {
-    network_id = hcloud_network.private_net.id
-    ip         = "10.0.1.10" # Static IP in subnet
-  }
-
   # Cloud-init to set up Python for Ansible
   user_data = <<-EOF
-    #cloud-config
-    package_update: true
-    package_upgrade: true
+#cloud-config
+package_update: true
+package_upgrade: true
 
-    # Set timezone and locale
-    timezone: UTC
-    locale: en_US.UTF-8
+packages:
+  - python3
+  - python3-apt
 
-    # Hostname (will be overridden by Terraform server name, but good to have)
-    hostname: n8n-server
+users:
+  - name: ${var.admin_user}
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: [sudo]
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ${local.effective_ssh_public_key}
 
-    packages:
-      - python3
-      - python3-pip
-      - git
-      - curl
-      - wget
-      - htop
-      - vim
-      - neovim
-      - ufw
-      - net-tools
-      - fail2ban
-      - htop
-      - iotop
-      - ncdu
-      - tree
-      - jq
-      - unzip
-      - software-properties-common
-      - apt-transport-https
-      - ca-certificates
-      - gnupg
-      - lsb-release
-    users:
-      - name: telemaco
-        sudo: ALL=(ALL) NOPASSWD:ALL
-        groups: [sudo, adm, docker]
-        shell: /bin/bash
-        ssh_authorized_keys:
-          - ${var.ssh_public_key}
+ssh_pwauth: false
 
-    ssh_pwauth: false
-    disable_root: true  # Keep root enabled initially for Hetzner's SSH key injection
-    package_update: true
-    package_upgrade: true
-    runcmd:
-      - echo "Cloud-init complete"
+${var.create_floating_ip ? <<-EOT
+write_files:
+  - path: /usr/local/sbin/configure-floating-ip.sh
+    permissions: '0755'
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      FIP="${hcloud_floating_ip.n8n_fip[0].ip_address}"
+      IFACE=$(ip -o -4 route show to default | awk '{print $5}' | head -n1)
+      if ! ip addr show dev "$IFACE" | grep -q "${hcloud_floating_ip.n8n_fip[0].ip_address}"; then
+        ip addr add "$FIP/32" dev "$IFACE"
+      fi
+
+  - path: /etc/systemd/system/hetzner-floating-ip.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Configure Hetzner Floating IP
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=simple
+      ExecStart=/bin/bash -lc 'while true; do /usr/local/sbin/configure-floating-ip.sh; sleep 30; done'
+      Restart=always
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
+EOT
+: ""}
+
+runcmd:
+  - echo "Cloud-init complete"
+${var.create_floating_ip ? "  - systemctl daemon-reload\n  - systemctl enable --now hetzner-floating-ip.service\n" : ""}
   EOF
 
   public_net {
@@ -166,8 +169,18 @@ resource "hcloud_server" "n8n_server" {
     ipv6_enabled = true
   }
 
-  depends_on = [
-    hcloud_network_subnet.n8n_subnet,
-    hcloud_firewall.n8n_fw
-  ]
+  depends_on = [hcloud_firewall.n8n_fw]
+}
+
+resource "hcloud_floating_ip" "n8n_fip" {
+  count         = var.create_floating_ip ? 1 : 0
+  name          = "${var.name}-fip"
+  type          = "ipv4"
+  home_location = var.location
+}
+
+resource "hcloud_floating_ip_assignment" "n8n_fip" {
+  count          = var.create_floating_ip ? 1 : 0
+  floating_ip_id = hcloud_floating_ip.n8n_fip[0].id
+  server_id      = hcloud_server.n8n_server.id
 }

@@ -1,4 +1,15 @@
 ---
+- name: Validate required secrets are set
+  ansible.builtin.assert:
+    that:
+      - n8n_encryption_key is defined
+      - n8n_encryption_key != 'CHANGE_ME'
+      - n8n_basic_auth_password is defined
+      - n8n_basic_auth_password != 'CHANGE_ME'
+      - postgres_password is defined
+      - postgres_password != 'CHANGE_ME'
+    fail_msg: "Set secrets in vars/secrets.yml (copy from vars/secrets.example.yml)."
+
 - name: Create n8n directory
   file:
     path: /opt/n8n
@@ -10,6 +21,12 @@
     path: /opt/n8n/data
     state: directory
     mode: "0755"
+
+- name: Copy Caddyfile
+  template:
+    src: Caddyfile.j2
+    dest: /opt/n8n/Caddyfile
+    mode: "0644"
 
 - name: Copy docker-compose.yml
   template:
@@ -29,6 +46,47 @@
     chdir: /opt/n8n
 
 - name: Start n8n stack
-  command: docker compose up -d
+  command: docker compose up -d --remove-orphans
   args:
     chdir: /opt/n8n
+
+- name: Wait for n8n to be reachable on localhost
+  ansible.builtin.uri:
+    url: http://127.0.0.1/
+    follow_redirects: none
+    status_code: 308,200
+    return_content: false
+  register: n8n_local_http
+  retries: 20
+  delay: 3
+  until: n8n_local_http.status in [200, 308]
+
+- name: Wait for floating IP to answer on HTTP (port 80)
+  ansible.builtin.wait_for:
+    host: "{{ n8n_domain }}"
+    port: 80
+    timeout: 180
+    delay: 5
+    state: started
+
+- name: Wait for floating IP to answer on HTTPS (port 443)
+  ansible.builtin.wait_for:
+    host: "{{ n8n_domain }}"
+    port: 443
+    timeout: 180
+    delay: 5
+    state: started
+
+- name: Validate HTTPS externally (requires correct DNS + open ports 80/443)
+  ansible.builtin.uri:
+    url: https://{{ n8n_domain }}/
+    status_code: 200
+    return_content: false
+    validate_certs: true
+  delegate_to: localhost
+  become: false
+  register: n8n_external_https
+  retries: 60
+  delay: 5
+  until: n8n_external_https.status == 200
+  when: validate_n8n_externally | default(true) | bool

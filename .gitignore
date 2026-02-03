@@ -12,3 +12,4 @@ terraform/n8n_key.pub
 
 # Ansible
 *.retry
+ansible/vars/secrets.yml

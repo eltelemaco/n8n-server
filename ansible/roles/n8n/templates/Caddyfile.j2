@@ -1,0 +1,11 @@
+{{ n8n_domain }} {
+	encode gzip
+	{% if n8n_use_self_signed | default(false) %}
+	tls internal
+	{% elif n8n_use_acme_staging | default(false) %}
+	tls {
+		ca https://acme-staging-v02.api.letsencrypt.org/directory
+	}
+	{% endif %}
+	reverse_proxy n8n:5678
+}

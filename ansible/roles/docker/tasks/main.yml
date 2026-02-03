@@ -1,41 +1,26 @@
 ---
-- name: Install dependencies for Docker
-  apt:
-    name:
-      - ca-certificates
-      - curl
-      - gnupg
-    state: present
+- name: Ensure dpkg is in a good state
+  ansible.builtin.command: dpkg --configure -a
+  changed_when: false
+  failed_when: false
 
-- name: Add Docker GPG key
-  shell: |
-    install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-    chmod a+r /etc/apt/keyrings/docker.asc
-  args:
-    creates: /etc/apt/keyrings/docker.asc
-
-- name: Add Docker repository
-  shell: |
-    echo \
-    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-    $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-    tee /etc/apt/sources.list.d/docker.list > /dev/null
-  args:
-    creates: /etc/apt/sources.list.d/docker.list
-
-- name: Update apt cache after adding docker repo
-  apt:
-    update_cache: yes
-
-- name: Install Docker Engine
-  apt:
+- name: Remove conflicting Docker CE packages (if present)
+  ansible.builtin.apt:
     name:
       - docker-ce
       - docker-ce-cli
       - containerd.io
       - docker-buildx-plugin
       - docker-compose-plugin
+    state: absent
+    purge: true
+
+- name: Install Docker (Ubuntu packages)
+  ansible.builtin.apt:
+    update_cache: true
+    name:
+      - docker.io
+      - docker-compose-v2
     state: present
 
 - name: Start and enable Docker
@@ -43,3 +28,11 @@
     name: docker
     state: started
     enabled: yes
+
+- name: Add users to docker group
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: docker
+    append: true
+  loop: "{{ docker_users | default([]) }}"
+  when: (docker_users | default([])) | length > 0

@@ -15,11 +15,4 @@ terraform {
       version = "~> 2.5"
     }
   }
-
-  cloud {
-    organization = "TelemacoInfraLabs"
-    workspaces {
-      name = "n8n-server"
-    }
-  }
 }
